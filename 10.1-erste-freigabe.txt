@@ -1,0 +1,6 @@
+[gemeinsam]
+   comment = gemeinsame Daten
+   path = /daten/gemeinsam
+   browsable = yes
+   read only = no
+   hosts allow = 192.168.123.0/255.255.255.0

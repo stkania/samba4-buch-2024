@@ -1,0 +1,9 @@
+[global]
+      workgroup = s1
+      realm = S1.EXAMPLE.NET
+      security = ADS
+      winbind refresh tickets = Yes
+      winbind scan trusted domains = yes
+      template shell = /bin/bash
+      idmap config * : backend = autorid
+      idmap config * : range = 1000000 - 4999999

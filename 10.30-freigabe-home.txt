@@ -1,0 +1,8 @@
+[users]
+        path = /home/EXAMPLE
+        comment = Home-Dirs
+        guest ok = no
+        read only = no
+        browseable = no
+        create mask = 700
+        directory mask = 700

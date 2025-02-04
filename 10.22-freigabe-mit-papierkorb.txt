@@ -1,0 +1,12 @@
+[firma]
+        path = /admin-share/firma
+        read only = no
+        vfs objects = acl_xattr recycle
+        recycle:repository = recycle/%U
+        recycle:touch = Yes
+        recycle:keeptree = Yes
+        recycle:versions = Yes
+        recycle:directory_mode = 700
+        recycle:noversions = *.iso,*.zip
+        recycle:exclude = *.tmp,*.temp,*.o,*.obj,*.TMP,*.TEMP
+        recycle:excludedir = /recycle,/tmp,/temp,/TMP,/TEMP

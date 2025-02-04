@@ -1,0 +1,6 @@
+forwarders {
+      1.1.1.1;
+};
+tkey-gssapi-keytab "/var/lib/samba/bind-dns/dns.keytab";
+
+dnssec-validation no;

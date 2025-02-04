@@ -1,0 +1,9 @@
+changetype: modify
+add: description
+description: Ein Benutzer
+-
+replace: wWWHomePage
+wWWHomePage: www.firma.de
+-
+replace: profilePath
+profilePath: \\\\fs01\\profile\\\%username\%

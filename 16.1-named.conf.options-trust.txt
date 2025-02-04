@@ -1,0 +1,7 @@
+forwarders {
+     8.8.8.8;
+     8.8.4.4;
+         };
+forward only;
+dnssec-validation no;
+allow-recursion { any; };

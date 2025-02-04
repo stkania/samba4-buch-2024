@@ -1,0 +1,6 @@
+[Abteilungen]
+   comment = Daten für alle Abteilungen
+   path = /admin-share/Abteilungen
+   force create mode = 0770
+   force directory mode = 0770
+   hide unreadable = yes

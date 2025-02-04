@@ -1,0 +1,5 @@
+---
+# tasks file for domaincontroller
+- import_tasks: setup_dc.yml
+  tags:
+    - init_dc

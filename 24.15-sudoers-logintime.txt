@@ -1,0 +1,2 @@
+%EXAMPLE\\sshloginmanage    ALL = (root) NOPASSWD: /absoluter/Pfad/zu/add-group.bash
+%EXAMPLE\\sshloginmanage    ALL = (root) NOPASSWD: /absoluter/Pfad/zu/del-group.bash

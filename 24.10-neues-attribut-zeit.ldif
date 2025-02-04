@@ -1,0 +1,18 @@
+# => .sshlogintime          = "Integer",
+# Replace 12345 in attributID with your ODI
+# add a prefix to sshlogintime like stka-sshlogintime
+# to show it's your attribute
+# change nc to your settings
+dn: CN=sshlogintime,CN=Schema,CN=Configuration,DC=example,DC=net
+changetype: add
+objectClass: attributeSchema
+attributeSyntax: 2.5.5.9
+oMSyntax: 2
+attributeID: 1.3.1.5.1.4.1.12345.1
+lDAPDisplayName: sshlogintime
+adminDisplayName: sshlogintime
+
+dn:
+changetype: modify
+add: schemaUpdateNow
+schemaUpdateNow: 1

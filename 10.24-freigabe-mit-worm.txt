@@ -1,0 +1,6 @@
+[worm]
+        path = /share/worm
+        readonly = no
+        browsable = no
+        vfs object = acl_xattr worm
+        worm:grace_period = 180

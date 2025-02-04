@@ -1,0 +1,4 @@
+  - name: Grep 
+    shell: "grep -c 'server role = active directory domain controller' /etc/samba/smb.conf"
+    register: is_dc
+    ignore_errors: true
