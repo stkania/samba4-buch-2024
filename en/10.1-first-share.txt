@@ -1,0 +1,6 @@
+[all]
+   comment = shared data
+   path = /data/all
+   browsable = yes
+   read only = no
+   hosts allow = 192.168.123.0/255.255.255.0

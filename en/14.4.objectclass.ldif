@@ -1,0 +1,11 @@
+# File class.ldif
+dn: CN=User,CN=Schema,CN=Configuration,DC=example,DC=net
+changetype: modify
+add: mayContain
+mayContain: textAttribute
+mayContain: boolAttribute
+
+dn:
+changetype: modify
+add: schemaUpdateNow
+schemaUpdateNow: 1
