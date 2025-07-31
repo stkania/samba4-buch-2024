@@ -1,0 +1,32 @@
+authoritative;
+ddns-update-style none;
+
+
+#Start failover configuration
+failover peer "dhcp-failover" {
+  primary;
+  address dc01.example.net;
+  peer address dc02.example.net;
+  max-response-delay 60;
+  max-unacked-updates 10;
+  mclt 3600;
+  split 128;
+  load balance max seconds 3;
+}
+# End failover configuration
+
+
+subnet 192.168.56.0 netmask 255.255.255.0 {
+  option subnet-mask 255.255.255.0;
+  option broadcast-address 192.168.56.255;
+  option time-offset 0;
+#  option routers 192.168.0.1;
+  option domain-name "example.net";
+  option domain-name-servers 192.168.56.21, 192.168.56.22;
+  option ntp-servers 192.168.56.21, 192.168.56.22;
+  pool {
+    failover peer "dhcp-failover"; # Add for failover
+    max-lease-time 1800; # 30 minutes
+    range 192.168.56.220 192.168.56.239;
+  }
+}

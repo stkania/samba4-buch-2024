@@ -1,0 +1,4 @@
+  - name: Grep for Kerberos-realm in smb.conf 
+    shell: grep -c 'realm = {{kerberos_realm}}' /etc/samba/smb.conf || true
+    register: is_joined
+    ignore_errors: true

@@ -1,0 +1,85 @@
+#!/bin/bash
+# Basic policies
+iptables -F
+iptables -P INPUT DROP
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+
+# allow Loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# allow three way handshake
+# for statefull inspection
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Dismiss SYN packages
+iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+iptables -I INPUT -m conntrack --ctstate NEW -p tcp ! --syn -j DROP
+
+# Dismiss fragmented packages
+iptables -A INPUT -f -j DROP
+
+# Dissmiss XMAS packages
+iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+
+# Dismiss all NULL packages
+iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+
+# Dismiss Spoof packages
+for SPOOF in 224.0.0.0/4 240.0.0.0/5 240.0.0.0/5 0.0.0.0/8 239.255.255.0/24 255.255.255.255; do
+    iptables -A INPUT -d ${SPOOF} -j DROP
+done
+for SPOOF in 10.0.0.0/8 169.254.0.0/16 172.16.0.0/12 127.0.0.0/8 192.168.0.0/24 224.0.0.0/4 240.0.0.0/5 0.0.0.0/8 ; do
+    iptables -A INPUT -s ${SPOOF} -j DROP
+done
+
+# Simple protection against Spoofing
+iptables -I INPUT -m conntrack --ctstate NEW,INVALID -p tcp --tcp-flags SYN,ACK SYN,ACK -j REJECT --reject-with tcp-reset
+
+# Simple DDoS protection
+iptables -A INPUT -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST -m limit --limit 1/s -j ACCEPT
+
+# Dismiss all invalid packages
+iptables -A INPUT -m state --state INVALID -j DROP
+iptables -A FORWARD -m state --state INVALID -j DROP
+iptables -A OUTPUT -m state --state INVALID -j DROP
+
+# Simple Portscann protection
+# IP will be blocked for 24 houres
+#   (3600 x 24 = 86400 Seconds)
+iptables -A INPUT -m recent --name portscan --rcheck --seconds 86400 -j DROP
+iptables -A FORWARD -m recent --name portscan --rcheck --seconds 86400 -j DROP
+
+# release IP after 24 Stunden
+iptables -A INPUT -m recent --name portscan --remove
+iptables -A FORWARD -m recent --name portscan --remove
+
+# Allowed ICMP
+iptables -A INPUT -p icmp --icmp-type 3 -j ACCEPT
+iptables -A INPUT -p icmp --icmp-type 8 -j ACCEPT
+iptables -A INPUT -p icmp --icmp-type 8 -j LOG --log-level debug --log-prefix "PING IP_TABLES:"
+iptables -A INPUT -p icmp --icmp-type 11 -j ACCEPT
+iptables -A INPUT -p icmp --icmp-type 12 -j ACCEPT
+
+# Bruteforce-SSH-Attack protection
+iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --set --name SSH --rsource
+iptables -A INPUT -p tcp -m tcp --dport 22 -m recent --rcheck --seconds 30 --hitcount 4 --rttl --name SSH \
+         --rsource -j REJECT --reject-with tcp-reset
+iptables -A INPUT -p tcp -m tcp --dport 22 -m recent --rcheck --seconds 30 --hitcount 3 --rttl --name SSH --rsource \
+         -j LOG --log-prefix "SSH brute force "
+iptables -A INPUT -p tcp -m tcp --dport 22 -m recent --update --seconds 30 --hitcount 3 --rttl --name SSH --rsource -j REJECT --reject-with tcp-reset
+iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --update --seconds 600 --hitcount 3  --rttl \
+         --name SSH -j DROP
+
+# Maximal 10 connections to Port 445 from single IP
+iptables -A INPUT -p tcp -m tcp --syn --dport 445 -m connlimit --connlimit-above 10 -j REJECT --reject-with tcp-reset
+
+# Allow SMB
+iptables -A INPUT -p tcp -m tcp --dport 445 -j ACCEPT
+
+# Allow SSH
+iptables -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+
+# Allow  Ping
+iptables -A OUTPUT -p icmp -m icmp --icmp-type 8 -j ACCEPT 

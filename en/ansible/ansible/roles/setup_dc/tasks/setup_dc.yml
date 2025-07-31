@@ -1,0 +1,387 @@
+---
+  - name: Check that variables are defined
+    assert:
+      that:
+        - ansible_userid is defined
+        - ansible_user_name is defined
+        - ansible_user_pw is defined  
+        - ssh_path is defined
+        - ssh_key_src is defined
+        - ssh_key_dest is defined
+        - samba_version is defined  
+        - kerberos_realm is defined
+        - dns_name is defined
+        - domain_name is defined
+        - dns_forwarder_one is defined
+        - dns_forwarder_two is defined
+        - ip_first_dc is defined
+        - ip_next_dc is defined  
+        - old_dns_ip is defined  
+        - group_first_dc is defined
+        - group_other_dc is defined
+        - first_dc is defined
+
+  - name: reread packagelist
+    apt:
+      update_cache: yes
+      cache_valid_time: 86400
+
+#Installing all needed packages 
+#whois is needed for mkpasswd
+  - name: install package "sudo" and "whois"
+    apt:
+      name: 
+        - sudo
+        - whois
+        - apt-transport-https
+
+# Create user ansible, this user will do all changes
+# after the first run. The fist run will run as root
+  - name: Add user "ansible" to server
+    user:
+      name: "{{ ansible_user_name }}"
+      comment: "ansible user"
+      uid: "{{ ansible_userid }}"
+      shell: /bin/bash
+      password: "{{ ansible_user_pw }}"
+      update_password: on_create
+
+# Create the .ssh directory to store the authorized_keys file
+# here we store the public-key of your ansible-user 
+# from your ansible-host
+  - name: create /home/{{ansible_user_name}}/.ssh
+    file:
+      path: "{{ ssh_path }}"
+      state: directory
+      mode: '0700'
+      owner: "{{ ansible_user_name }}"
+      group: "{{ ansible_user_name }}"
+
+# Copy the public-key for user ansible from ansible-host and create authorized_keys file 
+  - name: copy public-key from user ansible to host
+    copy:
+      src: "{{ ssh_key_src }}"
+      dest: "{{ ssh_key_dest }}"
+      owner: "{{ ansible_user_name }}"
+      group: "{{ ansible_user_name }}"
+      mode: '644'
+
+# Give user "ansible" root-permission on host with no password        
+# replace the file files/sudoers with your own file
+# the file is the default from debian 10
+  - name: copy "sudoers" to first DC
+    copy:
+      src: files/sudoers
+      dest: /etc/sudoers
+      owner: root
+      group: root
+      mode: '440'
+      force: yes
+      validate: /usr/sbin/visudo -csf %s
+
+# Preparing for download the samba-packages from Louis van Belle
+  - name: Download public from Louis van Belle
+    get_url:
+      url: http://apt.van-belle.nl/louis-van-belle.gpg-key.asc
+      dest: /home/{{ansible_user_name}}/
+
+  - name: Install public key from Louis van Belle
+    command: apt-key add /home/{{ansible_user_name}}/louis-van-belle.gpg-key.asc
+  
+  - name: create file for repository
+    file:
+      path: /etc/apt/sources.list.d/van-belle.list
+      state: touch
+      owner: root
+      group: root
+      mode: u=rw,g=r,o=r
+
+  - name: Setup header line for the repository
+    lineinfile:
+      path: /etc/apt/sources.list.d/van-belle.list
+      line: '# AptVanBelle repo for samba.'
+
+  - name: Add the repository line for samba
+    lineinfile:
+      path: /etc/apt/sources.list.d/van-belle.list
+      line: deb http://apt.van-belle.nl/debian buster-{{samba_version}} main contrib non-free"
+      insertafter: '^# AptVanBelle repo for samba'
+
+  - name: reread packagelist
+    apt:
+      update_cache: yes
+
+#Installing all needed packages for Samba-DC with bind9 
+  - name: install samba- and bind9-package for ADDC 
+    apt:
+      name: 
+        - samba
+        - libpam-heimdal
+        - heimdal-clients  
+        - ldb-tools
+        - winbind
+        - libpam-winbind
+        - smbclient
+        - libnss-winbind
+        - bind9
+        - dnsutils
+        - ntp
+      dpkg_options: 'force-confdef'      
+
+##################################################
+# Start provision the domain and configure bind9 #    
+##################################################
+ 
+#  - name: Grep smb.conf for "active directory domain controller"
+#  if you run the a second time create a new empty smb.conf
+  - name: Grep 
+    shell: "grep -c 'server role = active directory domain controller' /etc/samba/smb.conf"
+    register: is_dc
+    ignore_errors: true
+
+  - name: Remove original smb.conf
+    file:
+      path: /etc/samba/smb.conf
+      state: absent
+    when: is_dc.stdout == "0"
+
+# Provison the first DC with bind9 als DNS-backend
+# runs only for the first DC
+  - name: Do the provision if first DC
+    command: samba-tool domain provision --dns-backend=BIND9_DLZ --realm={{kerberos_realm}} --domain={{domain_name}} --adminpass={{admin_password}} --server-role=dc
+    when: 
+      - is_dc.stdout == "0" and 
+        group_first_dc in group_names
+
+# Create the DNS-record for the new DC
+# This will create a DNS-record on the first DC for the next DC
+  - name: create DNS-record for new DC
+    command: samba-tool dns add {{first_dc}} {{dns_name}} {{inventory_hostname}} A {{ip_next_dc}} -U administrator --password={{admin_password}}
+    when: 
+      - is_dc.stdout == "0" and 
+        group_other_dc in group_names
+
+# Join DC to existing domain with bind9 as DNS-backend
+# will only run on all other DC
+  - name: Do the join all other DC
+    command: samba-tool domain join {{dns_name}} --dns-backend=BIND9_DLZ DC  --realm={{kerberos_realm}}  -U administrator --password={{admin_password}}
+    when: 
+      - is_dc.stdout == "0" and 
+        group_other_dc in group_names
+        
+# Set interfaces in smb.conf of first DC
+# so the first DC will listen only on it's first IP
+  - name: Add interfaces to smb.conf of first DC
+    blockinfile:
+      path: /etc/samba/smb.conf
+      block: |
+        interfaces = {{ip_first_dc}}
+        bind interfaces only = yes
+      insertafter: "workgroup"
+    when:
+      - is_dc.stdout == "0" and
+        group_first_dc in group_names
+
+# Set interfaces in smb.conf on any other DC
+# so the next DC will only listen to it's first IP
+  - name: Add interfaces to smb.conf of other DC
+    blockinfile:
+      path: /etc/samba/smb.conf
+      block: |
+        interfaces = {{ip_next_dc}}
+        bind interfaces only = yes
+      insertafter: "workgroup"
+    when:
+      - is_dc.stdout == "0" and
+        group_other_dc in group_names
+
+# Do all the changes to /etc/bind/named.conf.options
+# Will set the forwarder and the gssapi-key
+  - name: Modify named.conf.options
+    blockinfile:
+      path: /etc/bind/named.conf.options
+      block: |
+             forwarders {
+               {{dns_forwarder_one}};
+               {{dns_forwarder_two}};
+             };
+             tkey-gssapi-keytab "/var/lib/samba/bind-dns/dns.keytab";
+      insertafter: '// };'
+# Copy the krb5.conf file to /etc/
+  - name: copy krb5.conf
+    copy:
+      src: /var/lib/samba/private/krb5.conf
+      dest: /etc
+      remote_src: yes
+
+# For all other then fist DC copy dns.keytab to /var/lib/samba/dns-bind
+# because of the bug that the dns.keytab is not in /var/lib/samba/bind-dns
+#can be deleted when the bug 14535 is fixed 
+  - name: copy dns.keytab if not first DC
+    copy:
+      src: /var/lib/samba/private/dns.keytab
+      dest: /var/lib/samba/bind-dns
+      owner: root
+      group: bind
+      mode: '0644'
+      remote_src: yes
+    when: "group_other_dc in group_names"
+
+# Do all the changes to /etc/bind/named.conf.options
+  - name: Modify named.conf.options
+    blockinfile:
+      path: /etc/bind/named.conf.options
+      block: |
+             forwarders {
+               {{dns_forwarder_one}};
+               {{dns_forwarder_two}};
+             };
+             tkey-gssapi-keytab "/var/lib/samba/bind-dns/dns.keytab";
+      insertafter: '// };'
+  
+  - name: change DNSSEC to "no"
+    replace:
+      path: /etc/bind/named.conf.options
+      regexp: 'dnssec-validation auto;'
+      replace: 'dnssec-validation no;'
+
+# Do all the changes to /etc/bind/named.conf.local
+  - name: Modify named.conf.local
+    blockinfile:
+      path: /etc/bind/named.conf.local
+      block: |
+             include "/var/lib/samba/bind-dns/named.conf";
+
+##################################################
+# Start checking filesystem-permission for bind9 #    
+##################################################
+#can be deleted when the bug 14535 is fixed 
+  - name: Checking permission for /var/lib/samba/dns-bind
+    file:
+      path: /var/lib/samba/bind-dns
+      state: directory
+      owner: root
+      group: bind
+      mode: '0770'
+  
+  - name: Checking permission for dns.keytab
+    file:
+      path: /var/lib/samba/bind-dns/dns.keytab
+      state: file
+      owner: root
+      group: bind
+      mode: '0640'
+
+  - name: Checking permission for /var/lib/samba/bind-dns/dns
+    file:
+      path: /var/lib/samba/bind-dns/dns
+      state: directory
+      owner: root
+      group: bind
+      mode: '0770'
+
+  - name: Checking permission for /var/lib/samba/bind-dns/dns/sam.ldb
+    file:
+      path: /var/lib/samba/bind-dns/dns/sam.ldb
+      owner: root
+      group: bind
+      mode: '0660'
+             
+  - name: Checking permission for /var/lib/samba/bind-dns/dns/sam.ldb.d
+    file:
+      path: /var/lib/samba/bind-dns/dns/sam.ldb.d
+      state: directory
+      owner: root
+      group: bind
+      mode: '0770'
+
+  - name: Listing files in /var/lib/samba/bind-dns/dns/sam.ldb.d/
+    find:
+      paths: /var/lib/samba/bind-dns/dns/sam.ldb.d/
+      file_type: file
+      patterns: "*"
+    register: db_files
+
+  - name: Checking permission for /var/lib/samba/bind-dns/dns/sam.ldb.d/*
+    file:
+      path: "{{ item.path }}"
+      state: file
+      owner: root
+      group: bind
+      mode: '0660'
+    with_items: "{{ db_files.files }}"  
+
+ # Restart bind9 after setting up the domain
+  - name: restart bind9 after setup
+    service:
+      name: bind9
+      state: restarted
+
+ # Stop and disable winbind smb and nmbd
+ # unmask the samba-ad-dc enable it and start it
+  - name: stopping smbd nmbd winbind
+    command: /usr/bin/systemctl stop smbd nmbd winbind
+
+  - name: diable smbd nmbd winbind
+    command: /usr/bin/systemctl disable smbd nmbd winbind
+
+  - name: unmask samba-ad-dc
+    command: /usr/bin/systemctl unmask samba-ad-dc
+
+  - name: enable samba-ad-dc
+    command: /usr/bin/systemctl enable samba-ad-dc
+
+  - name: starting samba-ad-dc
+    service:
+      name: samba-ad-dc
+      state: started
+
+# Replace nameserver in /etc/network/interfaces for first DC
+# the original DNS-server IP will be replaced with the own IP
+  - name: replace nameserver-settings
+    replace:
+      path: /etc/network/interfaces
+      regexp: 'dns-nameservers {{old_dns_ip}}'
+      replace: 'dns-nameservers {{ip_first_dc}}'
+    when: "group_first_dc in group_names"
+    
+# Replace nameserver in /etc/network/interfaces for next DC
+# Replace the IP from the first DC as DNS-server and setting the own IP
+  - name: replace nameserver-settings
+    replace:
+      path: /etc/network/interfaces
+      regexp: 'dns-nameservers {{ip_first_dc}}'
+      replace: 'dns-nameservers {{ip_next_dc}}'
+    when: "group_other_dc in group_names"
+
+# copy the configuration for ntp      
+  - name: copy "ntp.conf" to first DC
+    copy:
+      src: files/ntp.conf
+      dest: /etc/
+      owner: root
+      group: ntp
+      mode: '440'
+      force: yes
+    
+# Seting permission for /var/lib/samba/npt_sign
+  - name: seting permission for /var/lib/samba/ntp_sign
+    file:
+      path: "/var/lib/samba/ntp_sign"
+      state: directory
+      mode: '0750'
+      owner: "root"
+      group: "ntp"
+
+# After setting up the configuration revoke root ssh-login
+# After the first run of the playbook the root-login via ssh will be revoked
+  - name: replace "PermitRootLogin= yes" for ssh
+    replace:
+      path: /etc/ssh/sshd_config
+      regexp: '^PermitRootLogin yes$'
+      replace: '#PermitRootLogin prohibit-password'
+   
+# Rebooting the system after everything is done
+  - name: reboot the DC
+    reboot:
+

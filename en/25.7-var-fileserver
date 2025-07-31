@@ -1,0 +1,41 @@
+#each host needs a user for ansible to change settings after
+#the first run without root
+# the uid of the ansible-user
+ansible_userid: "1111"
+# the nam of the ansible-user
+ansible_user_name: "ansible"
+# This password was created with "mkpasswd -m sha-512 secret"
+# mkpasswd needs the package "whois"
+ansible_user_pw: "$6$xxXsW7PkKsJ3jPvk$tlkixHKFUA/Sh4VhsuVaTysB0dNpMm6FoKqEynq83SrbdCXjjDmYCaBzFZrQM5bIN2oTSH0p8n1C \
+    1r5pV5M.b/"
+# Path to the .ssh-directory of the ansible-user on the ansible-host
+ssh_path: "/home/ansible/.ssh"
+# ssh-key from ansible-user on ansible-host
+# replace this with the public-key from your ansible-user
+# on your ansible-host
+ssh_key_src: "/home/ansible/.ssh/id_rsa.pub"
+# Destination of the authorized_keys file on the target host 
+ssh_key_dest: "/home/ansible/.ssh/authorized_keys"
+# Group in inventory for all fileserver
+group_fileserver: fileserver
+samba_version: samba421
+# Define kerberos realm
+kerberos_realm: EXAMPLE.NET
+# Define DNS-name
+dns_name: example.net
+# Define Domainname
+domain_name: example
+# Name of the first DC
+first_dc: addc-01
+# Domainadmin password
+admin_password: Pa55w0rd
+# Fixed IP of the first DC 
+# this will be the new DNS-Server 1
+ip_first_dc: 192.168.56.21
+# Fixed IP of the next DC
+# tihs will be the new DNS-Server 2
+ip_next_dc: 192.168.56.22
+own_ip: 192.168.56.23
+# old DNS-Server during setup
+# this will be replaced befor join
+old_dns_ip: 8.8.8.8
