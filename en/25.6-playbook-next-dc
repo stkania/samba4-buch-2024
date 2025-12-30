@@ -1,4 +1,0 @@
----
-- hosts: next_dc
-  roles:
-    - setup_dc

@@ -1,9 +1,0 @@
-changetype: modify
-add: description
-description: A username
--
-replace: wWWHomePage
-wWWHomePage: www.company.de
--
-replace: profilePath
-profilePath: \\\\fs01\\profile\\\%username\%

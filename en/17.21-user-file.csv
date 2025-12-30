@@ -1,6 +1,0 @@
-#user-ou;surname;given-name;home-drive;home-directory;profil-path;mail-address;LOGNAME;PASSWORT;
-ou=management,ou=departmentsen,ou=samba-book;verw-u2;u2;H:;\\\\fs01\\users\\verw-u2;\\\\fs01\\profile\\verw-u2\\;verw-u2@example.net;verw-u2;Pa55word;
-ou=management,ou=departmentsen,ou=samba-book;verw-u3;u3;H:;\\\\fs01\\users\\verw-u3;\\\\fs01\\profile\\verw-u3\\;verw-u3@example.net;verw-u3;Pa55word;
-ou=management,ou=departmentsen,ou=samba-book;verw-u4;u4;H:;\\\\fs01\\users\\verw-u4;\\\\fs01\\profile\\verw-u4\\;verw-u4@example.net;verw-u4;Pa55word;
-ou=management,ou=departmentsen,ou=samba-book;verw-u5;u5;H:;\\\\fs01\\users\\verw-u5;\\\\fs01\\profile\\verw-u5\\;verw-u5@example.net;verw-u5;Pa55word;
-

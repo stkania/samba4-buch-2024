@@ -1,7 +1,0 @@
----
-# handlers file for setup_first_addc
-  - name: reload samba-ad-dc
-    service:
-      name: samba-ad-dc
-      state: reloaded
-
